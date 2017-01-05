@@ -26,7 +26,7 @@ See https://github.com/xkjyeah/gobible-creator
 
 NB. This is Jolon's legacy code from **March 2008**. 
 
-_It is not the latest code as hosted by CrossWire within the SVN repository.
+It is not the latest code as hosted by CrossWire within the SVN repository.
 
 David Haslam
 
