@@ -19,5 +19,7 @@ See https://github.com/xkjyeah/gobible-creator
 GoBibleCore was not included in Daniel Sim's repository, hence the need for this archive.
 
 David Haslam
+
 Go Bible project leader
+
 CrossWire Bible Society
