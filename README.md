@@ -8,15 +8,25 @@ In 2008, the **CrossWire Bible Society** formally adopted the Go Bible project b
 
 For further details see https://crosswire.org/wiki/Projects:Go_Bible
 
+Jolon's original source code was hosted by Google.
+
 The program was developed further be several volunteer programmers in succession, ending with Daniel Sim.
 
-During most of that time, the source code was hosted by **Google Code**.
+During most of that time, the source code was hosted by **CrossWire** using SVN.
 
-After Google stopped hosting code, the source code for **Go Bible Creator** was moved to github.
+Until 1st March 2014, this was the most up to date source code version for **Go Bible** and **Go Bible Creator**.
+
+See https://crosswire.org/svn/gobible/
+
+However, Daniel's **SymScroll** branch of **Go Bible Creator** was developed on GitHub rather than on CrossWire.
 
 See https://github.com/xkjyeah/gobible-creator
 
-GoBibleCore was not included in Daniel Sim's repository, hence the need for this archive.
+**GoBibleCore** was not included in Daniel Sim's repository, hence the putative need for this archive.
+
+NB. This is Jolon's legacy code from **March 2008**. 
+
+_It is not the latest code as hosted by CrossWire within the SVN repository.
 
 David Haslam
 
