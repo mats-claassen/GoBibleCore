@@ -24,12 +24,21 @@ See https://github.com/xkjyeah/gobible-creator
 
 **GoBibleCore** was not included in Daniel Sim's repository, hence the putative need for this archive.
 
-NB. This is Jolon's legacy code from **March 2008**. 
+### UPDATE: 2017-11-17
 
-It is not the latest code as hosted by CrossWire within the SVN repository.
+This repository was started as a copy of Jolon's legacy code from **March 2008**. 
+
+It is now been updated with the latest code as hosted by CrossWire within the SVN repository.
 
 David Haslam
 
-Go Bible project leader
+Go Bible project leader, CrossWire Bible Society
 
-CrossWire Bible Society
+
+----------
+
+NB. Go Bible is no longer being actively developed by CrossWire.
+
+This is due to the popularity of smart-phones having largely overtaken feature phones in many countries.
+
+Even so, there are parts of the world where even Android phones are too expensive for many people, so there's still a good opportunity for Go Bible applications to bring God's word to 
