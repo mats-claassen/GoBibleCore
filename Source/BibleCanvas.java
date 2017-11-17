@@ -2,8 +2,23 @@
 //  BibleCanvas.java
 //  GoBible
 //
-//  Created by Jolon Faichney on Sat Jul 19 2003.
-//  Copyright (c) 2003. All rights reserved.
+//	Go Bible is a Free Bible viewer application for Java mobile phones (J2ME MIDP 1.0 and MIDP 2.0).
+//	Copyright © 2003-2008 Jolon Faichney.
+//	Copyright © 2008-2009 CrossWire Bible Society.
+//
+//	This program is free software; you can redistribute it and/or
+//	modify it under the terms of the GNU General Public License
+//	as published by the Free Software Foundation; either version 2
+//	of the License, or (at your option) any later version.
+//
+//	This program is distributed in the hope that it will be useful,
+//	but WITHOUT ANY WARRANTY; without even the implied warranty of
+//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//	GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License
+//	along with this program; if not, write to the Free Software
+//	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
 
 import javax.microedition.lcdui.*;
@@ -53,6 +68,10 @@ public class BibleCanvas extends Canvas implements CommandListener
 	private Command exitCommand = new Command(GoBible.getString("UI-Exit"), Command.EXIT, 0);
 	private Command cancelCommand = new Command(GoBible.getString("UI-Cancel"), Command.CANCEL, 0);
 
+	/**
+	 * The verses of string. eg. Mark 1:1 of 45.
+	 */
+	private String ofString = GoBible.getString("UI-Of");
 	
 	/**
 	 * By default display the splash screen
@@ -72,12 +91,15 @@ public class BibleCanvas extends Canvas implements CommandListener
 	// Save the width and height for fast access
 	int width;
 	int height;
-	
+
+	// position information used in the Touch event processing
+	private int firstX, firstY;
+	private int diffX, diffY;
 	//private int keyCode;
 	
 	// Viewing mode fields
 	int lineStart, lastSpace, y, drawX;
-	
+
 	// These fields indicate that the current verse is larger than the displayable
 	// area and that intra-verse scrolling is required
 	private boolean moreVerseDown;
@@ -107,8 +129,120 @@ public class BibleCanvas extends Canvas implements CommandListener
 	public BibleCanvas(GoBible goBible)
 	{
 		this.goBible = goBible;
+		// boolean supportsMotion = hasPointerMotionEvents();
 	}
-	
+
+	// the stylus, touch screen, or trackball was pressed
+	protected void pointerPressed(int x, int y)
+	{
+		firstX =  x;
+		firstY =  y;
+		diffX = diffY = 0;
+	}
+
+	/// These constants are used as an initial guess/start for values that should
+	/// eventually end up in the UI Preferences and would likely be customized
+	/// by users on different devices due to performance of the specific hardware.
+	private static final int SCROLL_SLOW = 9;	// 5;
+	private static final int SCROLL_MED = 13;	// 9;
+	private static final int SCROLL_FAST = 18;	// 12;
+	private int throwAwayScrollCount = 0;
+
+	/**
+	 * This method is used to handle the 'Touch' event 'pointerDragged'.
+	 *
+	 * Simulate the user scrolling by verse, chapter or book depending on how
+	 * fast the users 'swipe' gesture is.
+	 *
+	 * @param x, x location
+	 * @param y, y location
+	 */
+	protected void pointerDragged(int x, int y)
+	{
+		if (y==firstY)
+			return;
+		// allow the user to stop motion after fast scroll before taking action again
+		if (throwAwayScrollCount > 0)
+		{
+			firstX = x;
+			firstY = y;
+			throwAwayScrollCount--;
+			return;
+		}
+		boolean didWork = false;
+		diffX = Math.abs(firstX - x);
+		diffY = Math.abs(firstY - y);
+
+		// if the change in 'x' is greater than the change in 'y'
+		if (diffY > diffX)
+		{
+			// if it's quantified as a 'slow scroll' - send scroll keypresses
+			if (diffY >= SCROLL_SLOW && diffY <= SCROLL_MED-1)
+			{
+				if (y > firstY)
+					keyPressed(KEY_NUM3);	// scroll up
+				else
+					keyPressed(KEY_NUM6);	// scroll down
+				didWork = true;
+			}
+			// if it's quantified as a 'med scroll' - send chapter keypresses
+			else if (diffY >= SCROLL_MED && diffY <= SCROLL_FAST-1)
+			{
+				if (y > firstY)
+					keyPressed(KEY_NUM2);	// chapter up
+				else
+					keyPressed(KEY_NUM5);	// chapter down
+				didWork = true;
+				// ignore the next couple to allow the user to slow down
+				throwAwayScrollCount = 8;	//2// skipp the next two
+			}
+			// if it's quantified as a 'fast scroll' - send book keypresses
+			else if (diffY >= SCROLL_FAST)
+			{
+				// limit the fast scroll to stop at the last and first books
+				if (y > firstY)
+				{
+					if (!goBible.isFirstBook())
+						keyPressed(KEY_NUM1);	// book up
+				}
+				else
+				{
+					if (!goBible.isLastBook())
+						keyPressed(KEY_NUM4);
+				}
+				didWork = true;
+				// ignore the next few to allow the user to slow down
+				throwAwayScrollCount = 25; //5;	// skipp the next five
+			}
+			// if we did something, update the display and reset the position
+			if (didWork)
+			{
+				update();
+				firstX = x;
+				firstY = y;
+			}
+		}
+	}
+
+	/**
+	 * pointerReleased 'touch' event - not currently needed / used.
+	 * @param x
+	 * @param y
+	 */
+//	protected void pointerReleased(int x, int y)
+//	{
+//		diffX = Math.abs(firstX - x);
+//		diffY = Math.abs(firstY - y);
+//		if (diffY > diffX && diffY > 20)
+//		{
+//			if (y > firstY)
+//				goBible.previousChapter(false);
+//			else
+//				goBible.nextChapter();
+//			update();
+//		}
+//	}
+
 	public void init()
 	{
 		// Get the alignment property
@@ -131,14 +265,29 @@ public class BibleCanvas extends Canvas implements CommandListener
 			{
 				Class.forName("javax.wireless.messaging.MessageConnection");
 				sendSMSCommand = new Command(GoBible.getString("UI-Send-SMS"), Command.SCREEN, 0);
-				
-				// Only create the MMS command if the WMA 2.0 API is supported
-				Class.forName("javax.wireless.messaging.MessagePart");
-				sendMMSCommand = new Command(GoBible.getString("UI-Send-MMS"), Command.SCREEN, 0);
+
+				if (false)
+				{
+					// Only create the MMS command if the WMA 2.0 API is supported
+					Class.forName("javax.wireless.messaging.MessagePart");
+					sendMMSCommand = new Command(GoBible.getString("UI-Send-MMS"), Command.SCREEN, 0);
+				}
 			}
 			catch (ClassNotFoundException e)
 			{
 				// Okay we just won't create the command
+			}
+			catch (Exception e)
+			{
+				/*
+				As of release 1.4, this exception has been retrofitted to conform
+				 to the general purpose exception-chaining mechanism. The "optional
+				 exception that was raised while loading the class" that may be provided
+				 at construction time and accessed via the getException() method is now
+				 known as the cause, and may be accessed via the Throwable.getCause()
+				 method, as well as the aforementioned "legacy method."
+				 * */
+				// try {Class.forName("javax.wireless.messaging.MessagePart");} catch(ClassNotFoundException te){}
 			}
 		}
 
@@ -175,7 +324,7 @@ public class BibleCanvas extends Canvas implements CommandListener
 			}
 
 			// Only add the send MMS command if the WMA 2.0 API is supported
-			if (sendMMSCommand != null)
+			if (sendMMSCommand != null && false)	// disable for the 2.4.0 release
 			{
 				addCommand(sendMMSCommand);
 			}
@@ -721,7 +870,7 @@ public class BibleCanvas extends Canvas implements CommandListener
 			
 			int bookNameWidth = boldFont.stringWidth(bookName);
 			int referenceStringWidth = boldFont.stringWidth(referenceString);
-			int ofStringWidth = boldFont.stringWidth(" of " + numberOfVerses);
+			int ofStringWidth = boldFont.stringWidth(" " + ofString + " " + goBible.localizeDigits(numberOfVerses + ""));
 			
 			int coreWidth = bookNameWidth + referenceStringWidth + 2 * BAR_PADDING;
 			
@@ -731,7 +880,7 @@ public class BibleCanvas extends Canvas implements CommandListener
 				// Draw the " of " string
 				//g.setGrayScale(64);
 				g.setColor(textColour);
-				g.drawString(" of " + numberOfVerses, width - BAR_PADDING, BAR_PADDING, Graphics.RIGHT | Graphics.TOP);
+				g.drawString(" " + ofString + " " + goBible.localizeDigits(numberOfVerses + ""), width - BAR_PADDING, BAR_PADDING, Graphics.RIGHT | Graphics.TOP);
 			}
 			else
 			{
@@ -820,7 +969,7 @@ public class BibleCanvas extends Canvas implements CommandListener
 				if (startChar == verseOffset)
 				{
 					g.setFont(boldFont);
-					String verseString = (verseIndex + 1) + "";
+					String verseString = goBible.localizeDigits("" + (verseIndex + 1));
 					
 					if (align == ALIGN_LEFT)
 					{
@@ -891,19 +1040,23 @@ public class BibleCanvas extends Canvas implements CommandListener
 							}
 						} // If line of text fits within the height of the display
 					}
-					else if (currentChar == ' ')
+// use Unicode Space code points
+//					else if (currentChar == ' ')
+					else if (isSpace(currentChar))
 					{
-						lastSpace = charIndex;
+						// if the space is the first character in the verse, don't track it
+						if (charIndex != startChar)
+							lastSpace = charIndex;
 					}
 				} // For each character in the verse
 				
 				// Render last line
-				if ((y + fontHeight) <= height && lineStart < verseEnd)
+				if ((y + fontHeight) <= height && ((lineStart < verseEnd) || (verseOffset == verseEnd)))
 				{
 					wrapCheck(verse, verseEnd, textWrap, fontHeight, styleRed, g, plainFont, verseIndex, barHeight);
 
 					// If there are still characters to be drawn then draw them
-					if ((y + fontHeight) <= height && lineStart < verseEnd)
+					if ((y + fontHeight) <= height && ((lineStart < verseEnd) || (verseOffset == verseEnd)))
 					{
 						// Draw from line start up to last space
 						drawChars(g, verse, lineStart, verseEnd - lineStart, drawX, y);
@@ -1032,9 +1185,121 @@ public class BibleCanvas extends Canvas implements CommandListener
 			g.drawChars(verse, offset, length, x, y, anchor);
 		}
 	}
-	
+
+	/**
+	 * Convert from a Surrogate Pair to the int Code Point
+	 *
+	 * @param sp1 Surrogate Pair - 1st UTF-16 char
+	 * @param sp2 Surrogate Pair - 2nd UTF-16 char
+	 * @return integer code point value
+	 */
+	public static int SPtoCP(char sp1, char sp2)
+	{
+		int cp = ((sp1 - 0xd800) << 10) + (sp2 - 0xDC00) + 0x10000;
+		return cp;
+	}
+
+	/**
+	 * Returns a surrogate pair number (1 or 2) OR zero if not a surrogate pair
+	 */
+	public static int isSurrogatePair(char ch)
+	{
+		if (ch >= 0xD800 && ch <= 0xDBFF) 	// 0xD800-0xDBFF
+		{
+			return 1;
+		}
+
+		if (ch >= 0xDC00 && ch <= 0xDFFF)	// 0xDC00-0xDFFF
+		{
+			return 2;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Is this a breaking character?
+	 * - See if it's a space, tab, etc...
+	 */
+	private boolean isBreakingCharacter(char ch)
+	{
+		boolean result = isSpace(ch);
+		if (result)
+		{
+			return result;
+		}
+
+		switch ((int)ch)
+		{
+			case 0x0009: // TAB
+			case 0x00AD: // SOFT HYPHEN (SHY)
+				result = true;
+				break;
+			default:
+				break;
+		}
+		return result;
+	}
+
+   /**
+	 * Follows the Unicode standard for determining if a code point is
+	 * a Unicode space character
+	 */
+	private boolean isSpace(char ch)
+	{
+		boolean result = false;
+		switch (ch)
+		{
+			case 0x0020: // SPACE
+			case 0x1680: // OGHAM SPACE MARK
+			case 0x2000: // EN QUAD
+			case 0x2001: // EM QUAD
+			case 0x2002: // EN SPACE
+			case 0x2003: // EM SPACE
+			case 0x2004: // THREE-PER-EM SPACE
+			case 0x2005: // FOUR-PER-EM SPACE
+			case 0x2006: // SIX-PER-EM SPACE
+			case 0x2007: // FIGURE SPACE
+			case 0x2008: // PUNCTUATION SPACE
+			case 0x2009: // THIN SPACE
+			case 0x200A: // HAIR SPACE
+			case 0x200B: // ZERO WIDTH SPACE
+			case 0x205F: // MEDIUM MATHEMATICAL SPACE
+			case 0x3000: // IDEOGRAPHIC SPACE
+				result = true;
+				break;
+			default:
+				break;
+		}
+		return result;
+	}
+
+	/**
+	 * Follows the Unicode standard for determining if a code point is
+	 * a Unicode non-breaking space (NBSP)
+	 */
+	private boolean isNonBreakingSpace(char ch)
+	{
+		boolean result = false;
+		switch ((int)ch)
+		{
+			case 0x00A0: // NO-BREAK SPACE
+			case 0x202F: // NARROW NO-BREAK SPACE
+			case 0x2060: // WORD JOINER (a zero width non-breaking space)
+				result = true;
+				break;
+			default:
+				break;
+		}
+		return result;
+	}
+
 	/**
 	 * Checks if the line needs to be wrapped and wraps if necessary.
+	 * The logic has been updated 11-2009 to consider the following cases:
+	 * - use all Unicode space code points
+	 * - allow non-breaking code points in the data
+	 * - not to break surrogate pairs when in the data
 	 */
 	private void wrapCheck(char[] verse, int charIndex, int textWrap, int fontHeight, boolean styleRed, Graphics g, Font font, int verseIndex, int barHeight)
 	{
@@ -1042,14 +1307,29 @@ public class BibleCanvas extends Canvas implements CommandListener
 		
 		if (x >= textWrap)
 		{
-			// Wrap
+			/*
+			 * Wrap - logic (turns out NonBreaking spaces aren't a factor)
+			 * - if lastSpace != -1 then always go there as the break place
+			 * - if lastSpace == -1
+			 *   + just back up until we are not in a surrogate pair
+			 **/
 			
 			int lineChars = lastSpace - lineStart;
-			
+			int charsToBackup = 0;
 			// If there was no last space to wrap with then wrap on the previous character
 			if (lastSpace == -1)
 			{
-				lineChars = charIndex - lineStart - 1;
+				charsToBackup = 1;	// the current is not completly visible, so back up One
+				char gz = verse[charIndex-1];
+				char gz1 = verse[charIndex-2];
+
+				// make sure this isn't the first part of a surrogate pair
+				if (isSurrogatePair(verse[charIndex-1]) == 1)
+				{
+					charsToBackup++;	// have to go to the preceeding character
+				}
+				//lineChars = charIndex - lineStart;	// dlh not correct - 1;
+				lineChars = charIndex - lineStart - charsToBackup;
 			}
 			
 			// Only draw characters if they are visible, and the last space
@@ -1061,12 +1341,13 @@ public class BibleCanvas extends Canvas implements CommandListener
 			}
 			
 			// Line start is now the character after the last space
-			lineStart = lastSpace != -1 ? lastSpace + 1 : charIndex - 1;
-			
-			if (lastSpace != -1)
-			{
-				lastSpace = charIndex;
-			}
+			lineStart = lastSpace != -1 ? lastSpace + 1 : charIndex; // dlh not correct - 1;
+			lineStart = lastSpace != -1 ? lastSpace + 1 : charIndex - charsToBackup;
+			lastSpace = -1;	// new line, so reset the last space found
+//			if (lastSpace != -1)
+//			{
+//				lastSpace = charIndex;
+//			}
 			
 			y += fontHeight;
 			drawX = TEXT_BORDER_LEFT;
@@ -1179,8 +1460,8 @@ public class BibleCanvas extends Canvas implements CommandListener
 	public void paintGoto(Graphics g)
 	{
 		// Get the current chapter and verse
-		String currentChapter = "" + (selection[SELECTION_CHAPTER] + goBible.bibleSource.getStartChapter(selection[SELECTION_BOOK]));
-		String currentVerse = "" + (selection[SELECTION_VERSE] + 1);
+		String currentChapter = goBible.localizeDigits("" + (selection[SELECTION_CHAPTER] + goBible.bibleSource.getStartChapter(selection[SELECTION_BOOK])));
+		String currentVerse = goBible.localizeDigits("" + (selection[SELECTION_VERSE] + 1));
 	
 		// Get book names
 		String[] bookNames = goBible.bibleSource.getBookNames();
@@ -1367,13 +1648,3 @@ public class BibleCanvas extends Canvas implements CommandListener
 		g.drawString(label, buttonX + 3, buttonY + 3, Graphics.TOP | Graphics.LEFT);
 	}
 }
-
-
-
-
-
-
-
-
-
-

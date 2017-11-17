@@ -2,8 +2,23 @@
 //  SearchingCanvas.java
 //  GoBible
 //
-//  Created by Jolon Faichney on Mon Jul 28 2003.
-//  Copyright (c) 2003. All rights reserved.
+//	Go Bible is a Free Bible viewer application for Java mobile phones (J2ME MIDP 1.0 and MIDP 2.0).
+//	Copyright © 2003-2008 Jolon Faichney.
+//	Copyright © 2008-2009 CrossWire Bible Society.
+//
+//	This program is free software; you can redistribute it and/or
+//	modify it under the terms of the GNU General Public License
+//	as published by the Free Software Foundation; either version 2
+//	of the License, or (at your option) any later version.
+//
+//	This program is distributed in the hope that it will be useful,
+//	but WITHOUT ANY WARRANTY; without even the implied warranty of
+//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//	GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License
+//	along with this program; if not, write to the Free Software
+//	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
 
 import java.util.*;
@@ -19,12 +34,15 @@ public class SearchingCanvas extends Canvas implements CommandListener, Runnable
 	private int currentChapter, currentBook;
 	private int searchFromBookIndex, searchToBookIndex;
 	private String searchString;
+
+	//private static Hashtable searchStringJump = new Hashtable();
 	
 	public SearchingCanvas(GoBible goBible, final int fromBookIndex, final int toBookIndex, final String searchString)
 	{
 		this.goBible = goBible;
 		
 		goBible.searchResults.removeAllElements();
+		goBible.lastSearchIndex = 0;	// dlh - have to reset it for the new search
 		
 		this.searchFromBookIndex = fromBookIndex;
 		this.searchToBookIndex = toBookIndex;
@@ -61,9 +79,8 @@ public class SearchingCanvas extends Canvas implements CommandListener, Runnable
 	 */
 	public void run()
 	{
-		//searchString = searchString.toLowerCase();
 		char[] searchData = searchString.toLowerCase().toCharArray();
-	
+
 		// Search each book
 		int endBook = searchToBookIndex;
 		
@@ -129,74 +146,84 @@ public class SearchingCanvas extends Canvas implements CommandListener, Runnable
 							//index = verseString.indexOf(searchString, verseStart);
 							index = find(verseData, verseStart, end, searchData);
 						}
-							
-						if ((index >= 0) && (index < verseEnd))
+
+						// if we found a match
+						if (index >= 0)
 						{
-							// We want to extract 10 characters before and after the 
-							// word. However, we also want to know whether how many
-							// characters we are missing from the verse before
-							// and after the extra 10 characters. If one side
-							// of the search result doesn't use all 10 characters
-							// eg. it is at the end of the verse, then we can
-							// use these values to shift characters over to the
-							// other side.
-							
-							int extraCharsBefore = (index - verseStart) - EXTRA_DISPLAY_CHARS;
-							int extraCharsAfter = verseEnd - (index + searchData.length + EXTRA_DISPLAY_CHARS);
-							
-							int beforeIndex = extraCharsBefore >= 0 ? index - EXTRA_DISPLAY_CHARS : verseStart;
-							int afterIndex = extraCharsAfter >= 0 ? index + searchData.length + EXTRA_DISPLAY_CHARS : verseEnd;
-							
-							// If there are spare characters which weren't used after
-							// then use them before if they are needed
-							if (extraCharsAfter < 0 && beforeIndex > verseStart)
-							{
-								beforeIndex += extraCharsAfter;
-								beforeIndex = beforeIndex < verseStart ? verseStart : beforeIndex;
-							}
+							// true if the index starts in this verse and contains the match
+							boolean containedInVerse = index >= verseStart && (index + searchData.length -1) < verseEnd;
 
-							// If there are spare characters which weren't used before
-							// then use them after if they are needed
-							if (extraCharsBefore < 0 && afterIndex < verseEnd)
+							// if the search can cross verse boundries AND it starts in this verse OR
+							//    the search can't cross verse boundries AND it starts and ends in this verse
+							if ((goBible.searchCanSpanMultipleVerses && index < verseEnd) ||
+									(!goBible.searchCanSpanMultipleVerses && containedInVerse))
 							{
-								afterIndex -= extraCharsBefore;
-								afterIndex = afterIndex > verseEnd ? verseEnd : afterIndex;
-							}							
-							
-							// If the first character is a letter then decrement the 
-							// beforeIndex until a non-letter is found, this ensures
-							// that the extracted doesn't start with half a word
-							if (isLetter(verseData[beforeIndex]))
-							{
-								while (beforeIndex > verseStart && isLetter(verseData[beforeIndex - 1]))
-								{
-									beforeIndex--;
-								}
-							}
+								// We want to extract 10 characters before and after the
+								// word. However, we also want to know whether how many
+								// characters we are missing from the verse before
+								// and after the extra 10 characters. If one side
+								// of the search result doesn't use all 10 characters
+								// eg. it is at the end of the verse, then we can
+								// use these values to shift characters over to the
+								// other side.
 
-							// If the last character is a letter then increment the 
-							// afterIndex until a non-letter is found, this ensures
-							// that the extracted doesn't end with half a word
-							if (isLetter(verseData[afterIndex - 1]))
-							{
-								while (afterIndex < verseEnd && isLetter(verseData[afterIndex]))
+								int extraCharsBefore = (index - verseStart) - EXTRA_DISPLAY_CHARS;
+								int extraCharsAfter = verseEnd - (index + searchData.length + EXTRA_DISPLAY_CHARS);
+
+								int beforeIndex = extraCharsBefore >= 0 ? index - EXTRA_DISPLAY_CHARS : verseStart;
+								int afterIndex = extraCharsAfter >= 0 ? index + searchData.length + EXTRA_DISPLAY_CHARS : verseEnd;
+
+								// If there are spare characters which weren't used after
+								// then use them before if they are needed
+								if (extraCharsAfter < 0 && beforeIndex > verseStart)
 								{
-									afterIndex++;
+									beforeIndex += extraCharsAfter;
+									beforeIndex = beforeIndex < verseStart ? verseStart : beforeIndex;
 								}
+
+								// If there are spare characters which weren't used before
+								// then use them after if they are needed
+								if (extraCharsBefore < 0 && afterIndex < verseEnd)
+								{
+									afterIndex -= extraCharsBefore;
+									afterIndex = afterIndex > verseEnd ? verseEnd : afterIndex;
+								}
+
+								// If the first character is a letter then decrement the
+								// beforeIndex until a non-letter is found, this ensures
+								// that the extracted doesn't start with half a word
+								if (isLetter(verseData[beforeIndex]))
+								{
+									while (beforeIndex > verseStart && isLetter(verseData[beforeIndex - 1]))
+									{
+										beforeIndex--;
+									}
+								}
+
+								// If the last character is a letter then increment the
+								// afterIndex until a non-letter is found, this ensures
+								// that the extracted doesn't end with half a word
+								if (isLetter(verseData[afterIndex - 1]))
+								{
+									while (afterIndex < verseEnd && isLetter(verseData[afterIndex]))
+									{
+										afterIndex++;
+									}
+								}
+
+								// Add verse to search results replacing style red character with a space
+								goBible.searchResults.addElement(new Object[]{new Integer((currentBook << 16) | (currentChapter << 8) | (currentVerse)), new String(verseData, beforeIndex, afterIndex - beforeIndex).replace('\u0001', ' ')});
+
+								numberFound++;
+
+								// Repaint screen when a new verse has been found
+								repaint();
+								serviceRepaints();
+
+								// Look for next instance of verse
+								//index = verseString.indexOf(searchString, index + 1);
+								index = find(verseData, index + 1, end, searchData);
 							}
-							
-							// Add verse to search results replacing style red character with a space
-							goBible.searchResults.addElement(new Object[]{new Integer((currentBook << 16) | (currentChapter << 8) | (currentVerse)), new String(verseData, beforeIndex, afterIndex - beforeIndex).replace('\u0001', ' ')});
-							
-							numberFound++;
-							
-							// Repaint screen when a new verse has been found
-							repaint();
-							serviceRepaints();
-							
-							// Look for next instance of verse
-							//index = verseString.indexOf(searchString, index + 1);
-							index = find(verseData, index + 1, end, searchData);
 						}
 					}
 				}
@@ -221,7 +248,12 @@ public class SearchingCanvas extends Canvas implements CommandListener, Runnable
 			goBible.showMainScreen();
 		}
 	}
-	
+
+	/**
+	 * This method returns true if we have an ASCII letter 'a' - 'z' ignoring case.
+	 * @param c : character to test
+	 * @return True if it's a letter.
+	 */
 	private final static boolean isLetter(char c)
 	{
 		return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
@@ -233,13 +265,19 @@ public class SearchingCanvas extends Canvas implements CommandListener, Runnable
 	 */
 	private final static int find(char[] data, int offset, int end, char[] searchData)
 	{
+		//return findUnicode(data, offset, end, searchData);
+
 		int result = -1;
 		int searchStringLength = searchData.length;
 		int totalEnd = end - searchStringLength;
 		char lowerDiff = (char) ('a' - 'A');
 		
-		for (int i = offset; i < totalEnd && result == -1; i++)
+		for (int i = offset; i <= totalEnd && result == -1; i++)
 		{
+			// ignore the U+001 code point - it's the toggle for red letter style
+			if (data[i] == 0x01)
+				continue;
+
 			char currentChar = data[i];
 			
 			// Convert to lower case
@@ -256,6 +294,10 @@ public class SearchingCanvas extends Canvas implements CommandListener, Runnable
 				
 				for (int j = 1; j < searchStringLength && matches; j++)
 				{
+					// ignore the U+001 code point - it's the toggle for red letter style
+					if (data[i+j] == 0x01)
+						continue;
+
 					currentChar = data[i + j];
 				
 					// Convert to lower case
@@ -279,7 +321,59 @@ public class SearchingCanvas extends Canvas implements CommandListener, Runnable
 		
 		return result;
 	}
-	
+
+
+//#if (DO_CASE_FOLDING)	// when this is defined, use the Character methods for case folding
+//# 	/**
+//# 	 * Finds the first occurance of the searchData string within
+//# 	 * the data string starting at the offset specified.
+//# 	 */
+//# 	private final static int findUnicode(char[] data, int offset, int end, char[] searchData)
+//# 	{
+//# 		int result = -1;
+//# 		int searchStringLength = searchData.length;
+//# 		int totalEnd = end - searchStringLength;
+//#
+//# 		for (int i = offset; i <= totalEnd && result == -1; i++)
+//# 		{
+//# 			// ignore the U+001 code point - it's the toggle for red letter style
+//# 			if (data[i] == 0x01)
+//# 				continue;
+//# 			// Convert to the lowercase equivalent of the character, if any;
+//# 			//  otherwise, the character itself is returned
+//# 			char currentChar = Character.toLowerCase(data[i]);
+//#
+//# 			// Quickly test the first character, if it doesn't match then we
+//# 			// can quickly move onto the next one
+//# 			if (currentChar == searchData[0])
+//# 			{
+//# 				boolean matches = true;
+//#
+//# 				for (int j = 1; j < searchStringLength && matches; j++)
+//# 				{
+//# 					// ignore the U+001 code point - it's the toggle for red letter style
+//# 					if (data[i+j] == 0x01)
+//# 						continue;
+//# 					// Convert to lower case
+//# 					currentChar = Character.toLowerCase(data[i+j]);
+//#
+//# 					if (currentChar != searchData[j])
+//# 					{
+//# 						matches = false;
+//# 					}
+//# 				}
+//#
+//# 				if (matches)
+//# 				{
+//# 					result = i;
+//# 				}
+//# 			}
+//# 		}
+//#
+//# 		return result;
+//# 	}
+//#endif
+
 	public void paint(Graphics g)
 	{
 		int width = getWidth();
