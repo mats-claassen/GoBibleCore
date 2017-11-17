@@ -1,5 +1,5 @@
 # GoBibleCore
-Archive of Legacy Java ME Source Code for Go Bible Core
+Java ME Source Code for Go Bible Core
 
 # History
 Jolon Faichney originally developed **Go Bible** as a free Bible Text viewer for Java ME enabled feature phones.
