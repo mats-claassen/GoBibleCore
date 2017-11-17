@@ -2,8 +2,23 @@
 //  GoBible.java
 //  GoBible
 //
-//  Created by Jolon Faichney on Sat Jul 19 2003.
-//  Copyright (c) 2003. All rights reserved.
+//	Go Bible is a Free Bible viewer application for Java mobile phones (J2ME MIDP 1.0 and MIDP 2.0).
+//	Copyright © 2003-2008 Jolon Faichney.
+//	Copyright © 2008-2009 CrossWire Bible Society.
+//
+//	This program is free software; you can redistribute it and/or
+//	modify it under the terms of the GNU General Public License
+//	as published by the Free Software Foundation; either version 2
+//	of the License, or (at your option) any later version.
+//
+//	This program is distributed in the hope that it will be useful,
+//	but WITHOUT ANY WARRANTY; without even the implied warranty of
+//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//	GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License
+//	along with this program; if not, write to the Free Software
+//	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
 import java.io.*;
 import java.util.*;
@@ -17,6 +32,7 @@ public class GoBible extends MIDlet implements Runnable
 	public final static boolean USE_MIDP20 = true;
 
 	public final static String UI_PROPERTIES_FILE_NAME = "/ui.properties";
+	public final static String GBCoreVer = "2.4.2";	// the version of this Core application
 
 	public final static int FONT_SIZE_SMALL = 0;
 	public final static int FONT_SIZE_MEDIUM = 1;
@@ -127,10 +143,11 @@ public class GoBible extends MIDlet implements Runnable
 	public String lastSearchString = "";
 	public int lastFromBook = -1;
 	public int lastToBook = -1;
-	
+	public boolean searchCanSpanMultipleVerses = false;	// true for old search behavior
+
 	// Search results
 	Vector searchResults = new Vector();
-
+	public int lastSearchIndex = 0;
 
 	// Bookmarks
 	Vector bookmarks = new Vector();
@@ -164,11 +181,19 @@ public class GoBible extends MIDlet implements Runnable
 	public long loadChapterTime;
 	public long skipTime;
 	
+	private static GoBible lastInstance = null;
+	
+	public GoBible() {
+		GoBible.lastInstance = this;
+	}
+	public static GoBible getInstance() { return lastInstance; }
+
 	public void startApp()
 	{
 		// Try to turn on the backlight
 		turnOnBacklight();
-	
+
+
 		if (firstRun)
 		{
 			firstRun = false;
@@ -397,7 +422,7 @@ public class GoBible extends MIDlet implements Runnable
 
 	public void showSendMMSScreen()
 	{
-		if (USE_MIDP20)
+		if (USE_MIDP20 && false)	// disable for now, 2.4.0 release until code fixed
 		{
 			display.setCurrent(new SendSMSForm(this, SendSMSForm.MMS));
 		}
@@ -422,13 +447,44 @@ public class GoBible extends MIDlet implements Runnable
 	public void showAboutAlert()
 	{
 		String infoString = getAppProperty("Go-Bible-Info");
-	
+		String safeAppName = getAppProperty("Go-Bible-Safe-Name");
+		String regAppName = getAppProperty("Application-Name");
+
+		String midletVersion = getAppProperty("MIDlet-Version");
+		String midletName = getAppProperty("MIDlet-Name");
+
+		String midletInfoUrl = getAppProperty("MIDlet-Info-URL");
+		String midletVendor = getAppProperty("MIDlet-Vendor");
+
+		if (midletVendor == null)	// shouldn't ever be null since GBCreator puts out a default value if not given
+			midletVendor = "";		// but just to be sure, we'll make it empty
+
+		if (midletInfoUrl == null)	// shouldn't ever be null since GBCreator puts out a default value if not given
+			midletInfoUrl = "";		// but just to be sure, we'll make it empty
+
 		if (infoString == null)
-		{
 			infoString = "";
+
+		// If there is a 'safe name' use it, if not use the 'app name', otherwise
+		// use 'Go Bible'.
+		if (safeAppName == null)
+		{
+			if (regAppName == null)
+				safeAppName = "Go Bible";
+			else
+				safeAppName = regAppName;
 		}
-	
-		display.setCurrent(new Alert(getString("UI-About") + " Go Bible", "by Jolon Faichney\nhttp://go-bible.org\n\"For the glory of our Lord Jesus Christ and the furtherance of His Kingdom\"\n" + infoString, null, AlertType.INFO));
+
+		// application name used in go bible creator
+		// the manifest file still has GoBible hardcoded. Should change?
+		//        		attributes.putValue("MIDlet-Name", collection.name + " " + applicationName);
+
+		display.setCurrent(
+                        new Alert(getString("UI-About") + " " + safeAppName,
+                            "Vendor: " + midletVendor + "\n" + midletInfoUrl +
+                            "\n\"For the glory of our Lord Jesus Christ and the furtherance of His Kingdom\"\n" +
+                            infoString +
+                            " Viewer Version: " + GBCoreVer, null, AlertType.INFO));
 	}
 	
 	/**
@@ -589,7 +645,8 @@ public class GoBible extends MIDlet implements Runnable
 		// If the excerpt length is less than the verse length then append an ellipsis
 		if (excerptSize < (verseEndOffset - verseOffset))
 		{
-			excerpt += "�";
+			//excerpt += "�";
+			excerpt += '\u2026';	// HORIZONTAL ELLIPSIS
 		}
 		
 		return excerpt;
@@ -660,7 +717,10 @@ public class GoBible extends MIDlet implements Runnable
 		
 		loadCurrentChapter();
 	}
-	
+
+	public boolean isLastBook() { return currentBookIndex == bibleSource.getNumberOfBooks();}
+	public boolean isFirstBook() { return currentBookIndex == 0;}
+
 	public void previousBook(boolean load)
 	{
 		// Go to the previous book
@@ -719,9 +779,14 @@ public class GoBible extends MIDlet implements Runnable
 			do
 			{
 				bytesRead = input.read(fileData, offset, fileData.length - offset);
+
+                                if (bytesRead == -1) {
+                                    break;
+                                }
+
 				offset += bytesRead;
 			}
-			while (bytesRead >= 0);
+			while (true);
 			
 			// Close input stream
 			input.close();
@@ -1129,4 +1194,25 @@ public class GoBible extends MIDlet implements Runnable
 			System.out.println("IOException in loadCurrentChapter()");
 		}
 	}
+	
+	
+    // Issue no. #24
+    public String localizeDigits(String s) {
+        String digits = null;
+        StringBuffer buffer = new StringBuffer();
+        if ( (digits = getString("UI-Digits")).equals("UI-Digits")) { // not available
+            return s; // no change
+        }
+        else if (digits.length() < 10) {
+            return s;
+        }
+        else {
+            int len = s.length();
+            for (int i=0 ; i<len; i++) {
+                buffer.append(digits.charAt(s.charAt(i) - '0'));
+            }
+            return buffer.toString();
+        }
+    }
+
 }

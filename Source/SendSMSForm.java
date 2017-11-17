@@ -1,11 +1,27 @@
 //
 //  SendSMSForm.java
-//  Go Bible 2.0
+//  GoBible
 //
-//  Created by Jolon Faichney on Mon Jun 14 2004.
-//  Copyright (c) 2004. All rights reserved.
+//	Go Bible is a Free Bible viewer application for Java mobile phones (J2ME MIDP 1.0 and MIDP 2.0).
+//	Copyright © 2003-2008 Jolon Faichney.
+//	Copyright © 2008-2009 CrossWire Bible Society.
+//
+//	This program is free software; you can redistribute it and/or
+//	modify it under the terms of the GNU General Public License
+//	as published by the Free Software Foundation; either version 2
+//	of the License, or (at your option) any later version.
+//
+//	This program is distributed in the hope that it will be useful,
+//	but WITHOUT ANY WARRANTY; without even the implied warranty of
+//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//	GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License
+//	along with this program; if not, write to the Free Software
+//	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
 
+import java.io.IOException;
 import javax.microedition.io.*;
 import javax.microedition.lcdui.*;
 import javax.wireless.messaging.*;
@@ -45,6 +61,7 @@ public class SendSMSForm extends Form implements CommandListener
 	private Command sendCommand = new Command(GoBible.getString("UI-Send"), Command.OK, 0);
 	
 	private String smsText;
+	private	String verseRange;
 
 	
 	public SendSMSForm(GoBible goBible, int type)
@@ -83,7 +100,7 @@ public class SendSMSForm extends Form implements CommandListener
 					int endVerse = Integer.parseInt(endVerseTextField.getString());
 					
 					int numberOfVerses = goBible.bibleSource.getNumberOfVerses(goBible.currentBookIndex, goBible.currentChapterIndex);
-					
+
 					// Make sure the verses are in range
 					if (startVerse >= 1 && endVerse >= 1 && startVerse <= numberOfVerses && endVerse <= numberOfVerses && endVerse >= startVerse)
 					{
@@ -105,14 +122,15 @@ public class SendSMSForm extends Form implements CommandListener
 							smsText += (i != endVerse ? " " : "\"");
 						}
 						
-						smsText += " (" + goBible.bibleSource.getBookName(goBible.currentBookIndex) + " " + (goBible.currentChapterIndex + goBible.bibleSource.getStartChapter(goBible.currentBookIndex)) + ":" + startVerse;
+						//smsText += " (";// + goBible.bibleSource.getBookName(goBible.currentBookIndex) + " " + (goBible.currentChapterIndex + goBible.bibleSource.getStartChapter(goBible.currentBookIndex)) + ":" + startVerse;
+						verseRange = goBible.bibleSource.getBookName(goBible.currentBookIndex) + " " + (goBible.currentChapterIndex + goBible.bibleSource.getStartChapter(goBible.currentBookIndex)) + ":" + startVerse;
 						
 						if (startVerse != endVerse)
 						{
-							smsText += "-" + endVerse;
+							verseRange += "-" + endVerse;
 						}
 						
-						smsText += ").";
+						smsText += " (" + verseRange + ").";
 						
 						try
 						{
@@ -159,24 +177,132 @@ public class SendSMSForm extends Form implements CommandListener
 					
 					try
 					{
-						// Create an SMS connection
-						MessageConnection connection = (MessageConnection) Connector.open((type == SMS ? "sms" : "mms") + "://" + phoneNumber, Connector.WRITE);
-						
-						// Create the SMS message
-						TextMessage message = (TextMessage) connection.newMessage(MessageConnection.TEXT_MESSAGE);
-						
-						message.setPayloadText(smsText);
-						
-						// Determine how many messages will be sent
-						int segments = connection.numberOfSegments(message);
-						
-						// Send the SMS message
-						connection.send(message);
-						
-						connection.close();
-						
-						// Go back the the main screen
-						goBible.showMainScreen();
+						if (type == SMS)
+						{
+							// Create an SMS connection
+							MessageConnection connection = (MessageConnection) Connector.open((type == SMS ? "sms" : "mms") + "://" + phoneNumber, Connector.WRITE);
+
+							// Create the SMS message
+							TextMessage message = (TextMessage) connection.newMessage(MessageConnection.TEXT_MESSAGE);
+
+							message.setPayloadText(smsText);
+
+							// Determine how many messages will be sent
+							int segments = connection.numberOfSegments(message);
+
+							// Send the SMS message
+							connection.send(message);
+
+							connection.close();
+
+							// Go back the the main screen
+							goBible.showMainScreen();
+						}
+						else	// MMS message type is created and sent here
+						{
+							/// Future example of Multipart Message sample to replace existing code
+							/*
+							 *
+							 /**
+								*  Sends a multi-part message on the specified connection
+								*
+								*  @param mc the MessageConnection
+								*  @param msgParts the array of message parts to send
+								*  @param startContentID is the ID of the start multimedia
+								*  content part (SMIL)
+								*  @param to is the message's TO list
+								*  @param cc is the message's CC list
+								*  @param bcc is the message's BCC list
+								*  @param subject is the message's subject
+								*  @param priority is the message's priority
+								*  @param url is the destination URL, typically used in server mode
+								*
+								final public void sendMultipartMessage(
+									MessageConnection mc,
+									MessagePart[] msgParts,
+									String startContentID,
+									String[] to,
+									String[] cc,
+									String[] bcc,
+									String subject,
+									String priority,
+									String url) {
+								try {
+									int i=0;
+									MultipartMessage multipartMessage;
+									multipartMessage = (MultipartMessage)
+										mc.newMessage(MessageConnection.MULTIPART_MESSAGE);
+									if (to != null) {
+										for (i=0; i<to.length; i++) {
+											multipartMessage.addAddress("to", to[i]);
+										}
+									}
+									if (cc != null) {
+										for (i=0; i<cc.length; i++) {
+											multipartMessage.addAddress("cc", cc[i]);
+										}
+									}
+									if (bcc != null) {
+										for (i=0; i<bcc.length; i++) {
+											multipartMessage.addAddress("bcc", bcc[i]);
+										}
+									}
+									multipartMessage.setSubject(subject);
+									if ((priority.equals("high")) ||
+										(priority.equals("normal")) ||
+										(priority.equals("low"))) {
+										multipartMessage.setHeader("X-Mms-Priority", priority);
+									}
+									for (i=0; i<msgParts.length; i++) {
+										multipartMessage.addMessagePart(msgParts[i]);
+									}
+									multipartMessage.setStartContentId(startContentID);
+									sendMessage(mc, multipartMessage, url);
+								} catch(Exception e) {
+									//  Handle the exception...
+								}
+							}
+							 *
+							 * */
+							MessageConnection connection = null;
+							MultipartMessage mpmsg = null;
+							String connUrl = "mms://" + phoneNumber;
+							try
+							{
+								connection = (MessageConnection)Connector.open(connUrl);
+							}
+							catch (IOException e){}
+							catch (SecurityException se) {}
+
+							if (connection == null)
+								break;
+
+							try
+							{
+								MessagePart msgPart = null;
+								mpmsg = (MultipartMessage)connection.newMessage(MessageConnection.MULTIPART_MESSAGE);
+								String time = String.valueOf(System.currentTimeMillis());
+								mpmsg.setHeader("X-Mms-Delivery-Time", time);
+								mpmsg.setHeader("X-Mms-Priority", "normal");
+
+								mpmsg.setSubject(verseRange);
+								String encoding = "UTF-8";
+								byte[] textMsgBytes = smsText.getBytes(encoding);
+								msgPart = new MessagePart(textMsgBytes, 0, textMsgBytes.length, "text/plain", "id0", null, encoding);
+								mpmsg.addMessagePart(msgPart);
+//								connection.send(mpmsg);
+							}
+							catch(Exception ex){}
+							finally
+							{
+								try
+								{
+									if (connection != null)
+										connection.close();
+								}
+								catch(Exception ex){}
+							}
+						}
 					}
 					catch (java.io.IOException e)
 					{

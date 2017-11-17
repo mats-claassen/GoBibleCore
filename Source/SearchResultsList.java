@@ -2,9 +2,25 @@
 //  SearchResultsList.java
 //  GoBible
 //
-//  Created by Jolon Faichney on Mon Jul 28 2003.
-//  Copyright (c) 2003. All rights reserved.
+//	Go Bible is a Free Bible viewer application for Java mobile phones (J2ME MIDP 1.0 and MIDP 2.0).
+//	Copyright © 2003-2008 Jolon Faichney.
+//	Copyright © 2008-2009 CrossWire Bible Society.
 //
+//	This program is free software; you can redistribute it and/or
+//	modify it under the terms of the GNU General Public License
+//	as published by the Free Software Foundation; either version 2
+//	of the License, or (at your option) any later version.
+//
+//	This program is distributed in the hope that it will be useful,
+//	but WITHOUT ANY WARRANTY; without even the implied warranty of
+//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//	GNU General Public License for more details.
+//
+//	You should have received a copy of the GNU General Public License
+//	along with this program; if not, write to the Free Software
+//	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+//
+
 
 import java.util.*;
 import javax.microedition.lcdui.*;
@@ -16,7 +32,10 @@ public class SearchResultsList extends javax.microedition.lcdui.List implements 
 
 	public SearchResultsList(GoBible goBible, Vector searchResults)
 	{
-		super(GoBible.getString("UI-Results"), Choice.IMPLICIT);
+//		String title = GoBible.getString("UI-Results");
+//		title += " - " + Integer.toString(searchResults.size());
+//		title += " " + GoBible.getString("UI-Found");
+		super(GoBible.getString("UI-Results")+" - " + Integer.toString(searchResults.size())+" " + GoBible.getString("UI-Found"), Choice.IMPLICIT);
 		
 		if (GoBible.USE_MIDP20)
 		{
@@ -39,7 +58,14 @@ public class SearchResultsList extends javax.microedition.lcdui.List implements 
 			
 			append(goBible.bibleSource.getBookName(bookIndex) + " " + goBible.bibleSource.getReferenceString(bookIndex, chapterIndex, verseIndex) + " \"" + ((String) entry[1]) + "\"", null);
 		}
-		
+		if (goBible.lastSearchIndex >= 0 && goBible.lastSearchIndex < this.size())
+		{
+			setSelectedIndex(goBible.lastSearchIndex, true);	// restore to the last selected index
+			if (isShown() == false)
+			{
+				;
+			}
+		}
 		addCommand(new Command(GoBible.getString("UI-Cancel"), Command.CANCEL, 0));
 		
 		setCommandListener(this);
@@ -53,7 +79,7 @@ public class SearchResultsList extends javax.microedition.lcdui.List implements 
 			
 			// Grab the reference
 			int selectedIndex = getSelectedIndex();
-			
+			goBible.lastSearchIndex = selectedIndex;	// save this point for future ref
 			int index = ((Integer) ((Object[]) searchResults.elementAt(selectedIndex))[0]).intValue();
 			
 			goBible.currentBookIndex = (index >> 16) & 0xff;
