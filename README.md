@@ -41,4 +41,4 @@ NB. Go Bible is no longer being actively developed by CrossWire.
 
 This is due to the popularity of smart-phones having largely overtaken feature phones in many countries.
 
-Even so, there are parts of the world where even Android phones are too expensive for many people, so there's still a good opportunity for Go Bible applications to bring God's word to 
+Even so, there are parts of the world where even Android phones are too expensive for many people, so there's still a good opportunity for Go Bible applications to bring God's word to them. 
