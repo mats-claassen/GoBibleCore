@@ -23,6 +23,8 @@
 
 import javax.microedition.lcdui.*;
 
+import java.lang.Math;
+
 public class BibleCanvas extends Canvas implements CommandListener
 {
 	private final static boolean DEBUG = false;
@@ -82,11 +84,15 @@ public class BibleCanvas extends Canvas implements CommandListener
 	int textColour = 0x000000;
 	int backColour = 0xFFFFFF;
 	int christWordsColour = 0xD00000;
+	int headingColor = 0xB0B0B0;
 	int highlightColour = 0xE0E0FF;
 	
 	// Text alignment
 	int align, anchor;
 	static boolean reverseCharacters;
+
+	// Text spacings
+	int headerSpacing = 10;
 	
 	// Save the width and height for fast access
 	int width;
@@ -905,9 +911,12 @@ public class BibleCanvas extends Canvas implements CommandListener
 
 			// Prepare to draw the verses
 			Font plainFont = Font.getFont(Font.FACE_SYSTEM, goBible.fontStyle == GoBible.FONT_STYLE_BOLD ? Font.STYLE_BOLD : Font.STYLE_PLAIN, goBible.FONT_SIZE_MAP[goBible.fontSize]);
+			// Font for the heading. We set the size to one larger than the plaintFont (if possible)
+			Font headingFont = Font.getFont(Font.FACE_SYSTEM, goBible.fontStyle == GoBible.FONT_STYLE_BOLD ? Font.STYLE_BOLD : Font.STYLE_PLAIN, goBible.FONT_SIZE_MAP[Math.min(goBible.fontSize + 1, 2)]);
 	
 			int textWrap = width - TEXT_BORDER_RIGHT;
 			int fontHeight = plainFont.getHeight();
+			int hFontHeight = headingFont.getHeight();
 			y = barHeight + BAR_PADDING;
 			moreVerseDown = false;
 			
@@ -926,6 +935,51 @@ public class BibleCanvas extends Canvas implements CommandListener
 	
 				//char[] verse = new String(GoBible.verseData, verseOffset, verseLength).toCharArray();
 				//chapter[verseIndex].toCharArray();
+                int index = 0;
+                while (index < goBible.headingIndex.headingCount &&
+                        goBible.headingIndex.headings[index].afterVerse < verseIndex) {
+                    index++;
+                }
+                if (index < goBible.headingIndex.headingCount &&
+                        goBible.headingIndex.headings[index].afterVerse == verseIndex) {
+                    // draw heading
+                    drawX = TEXT_BORDER_LEFT;
+                    y += headerSpacing;
+                    g.setColor(headingColor);
+                    g.setFont(headingFont);
+
+                    // get initial and final character. We have to substract the chapter offset as these offset numbers
+					// are for the entire book.
+                    int startChar = goBible.headingIndex.headings[index].offset - goBible.headingIndex.headings[0].offset;
+                    int headingEnd = goBible.headingIndex.headings[index].offset +
+							goBible.headingIndex.headings[index].length  - goBible.headingIndex.headings[0].offset;
+                    int hlineStart = startChar;
+                    int hlastSpace = -1;
+                    for (int charIndex = startChar; (charIndex < headingEnd) && ((y + hFontHeight) <= height); charIndex++) {
+                        if (isSpace(goBible.headingData[charIndex]))
+                        {
+                            // if the space is the first character in the verse, don't track it
+                            if (charIndex != startChar)
+                                hlastSpace = charIndex;
+                        }
+
+                        int x = headingFont.charsWidth(goBible.headingData, hlineStart, charIndex - hlineStart) + drawX;
+
+                        if (x >= textWrap) {
+                            hlineStart = drawHeadingLine(index, hlineStart, charIndex, hlastSpace,
+                                    hFontHeight, barHeight, g);
+                            hlastSpace = -1;
+                            y += hFontHeight;
+                        }
+                    }
+                    if (hlineStart < headingEnd) {
+                        drawChars(g, goBible.headingData, hlineStart, headingEnd - hlineStart, drawX, y);
+                        y += hFontHeight;
+                    }
+                    // reset things
+                    g.setColor(textColour);
+                    g.setFont(plainFont);
+                }
 	
 				drawX = TEXT_BORDER_LEFT;
 						
@@ -1294,6 +1348,40 @@ public class BibleCanvas extends Canvas implements CommandListener
 		return result;
 	}
 
+	private int drawHeadingLine(int index, int lineStart, int lastChar, int lastSpace, int fontHeight, int barHeight, Graphics g) {
+
+	    int lineChars = lastSpace - lineStart;
+        int charsToBackup = 0;
+        // If there was no last space to wrap with then wrap on the previous character
+        if (lastSpace == -1)
+        {
+            charsToBackup = 1;	// the current is not completly visible, so back up One
+
+            // make sure this isn't the first part of a surrogate pair
+            if (isSurrogatePair(goBible.headingData[lastChar-1]) == 1)
+            {
+                charsToBackup++;	// have to go to the preceeding character
+            }
+            lineChars = lastChar - lineStart - charsToBackup;
+        }
+
+        // Only draw characters if they are visible, and the last space
+        // is after the line start, it may be before or after a style change
+        if ((y + fontHeight) <= height && (y + fontHeight) > barHeight && lineChars >= 0)
+        {
+            // Draw from line start up to last space
+            drawChars(g, goBible.headingData, lineStart, lineChars, drawX, y);
+        }
+
+
+        drawX = TEXT_BORDER_LEFT;
+
+        // Line start is now the character after the last space
+        return  lastSpace != -1 ? lastSpace + 1 : lastChar - charsToBackup;
+
+
+    }
+
 	/**
 	 * Checks if the line needs to be wrapped and wraps if necessary.
 	 * The logic has been updated 11-2009 to consider the following cases:
@@ -1320,15 +1408,12 @@ public class BibleCanvas extends Canvas implements CommandListener
 			if (lastSpace == -1)
 			{
 				charsToBackup = 1;	// the current is not completly visible, so back up One
-				char gz = verse[charIndex-1];
-				char gz1 = verse[charIndex-2];
 
 				// make sure this isn't the first part of a surrogate pair
 				if (isSurrogatePair(verse[charIndex-1]) == 1)
 				{
 					charsToBackup++;	// have to go to the preceeding character
 				}
-				//lineChars = charIndex - lineStart;	// dlh not correct - 1;
 				lineChars = charIndex - lineStart - charsToBackup;
 			}
 			
@@ -1341,7 +1426,6 @@ public class BibleCanvas extends Canvas implements CommandListener
 			}
 			
 			// Line start is now the character after the last space
-			lineStart = lastSpace != -1 ? lastSpace + 1 : charIndex; // dlh not correct - 1;
 			lineStart = lastSpace != -1 ? lastSpace + 1 : charIndex - charsToBackup;
 			lastSpace = -1;	// new line, so reset the last space found
 //			if (lastSpace != -1)

@@ -53,16 +53,20 @@ public class CombinedChapterBibleSource extends BibleSource
 	// of the verse data and the third entry being for the
 	// number of verses.
 	private int[][] combinedChapterIndex;
-	
+
 	// Book index
 	private int[][] bookIndex;
+	private ChapterHeadingInfo[] bookHeadingIndex;
 	
 	private char[] fileData;
-	
+	private char[] headingFileData;
+
 	// Current chapter data
 	private char[] verseData;
-	
+	private char[] headingData;
+
 	private int verseDataSize;
+	private int headingDataSize;
 	
 	public CombinedChapterBibleSource(GoBible goBible) throws IOException
 	{
@@ -101,7 +105,7 @@ public class CombinedChapterBibleSource extends BibleSource
 			int numberOfChapters = input.readUnsignedShort();
 			this.numberOfChapters[bookIndex] = numberOfChapters;
 			combinedChapterIndex[bookIndex] = new int[numberOfChapters << 2];
-			
+
 			int previousFileNumber = 0;
 			int verseDataOffset = 0;
 			
@@ -112,7 +116,6 @@ public class CombinedChapterBibleSource extends BibleSource
 				int allVersesLength = input.readInt();
 				
 				combinedChapterIndex[bookIndex][chapterIndex << 2] = fileNumber;
-				
 				if (fileNumber != previousFileNumber)
 				{
 					verseDataOffset = 0;
@@ -133,8 +136,7 @@ public class CombinedChapterBibleSource extends BibleSource
 		
 		input.close();
 	}
-	
-	
+
 	
 	public char[] getChapter(int bookIndex, int chapterIndex) throws IOException
 	{
@@ -150,6 +152,23 @@ public class CombinedChapterBibleSource extends BibleSource
 		loadChapter(bookIndex, chapterIndex);
 		
 		return this.bookIndex[chapterIndex];
+	}
+
+
+	public char[] getChapterHeadings(int bookIndex, int chapterIndex) throws IOException
+	{
+		// Load the chapter if it isn't loaded
+		loadChapter(bookIndex, chapterIndex);
+
+		return headingData;
+	}
+
+	public ChapterHeadingInfo getChapterHeadingIndex(int bookIndex, int chapterIndex) throws IOException
+	{
+		// Load the chapter if it isn't loaded
+		loadChapter(bookIndex, chapterIndex);
+
+		return this.bookHeadingIndex[chapterIndex];
 	}
 	
 	private void loadChapter(int bookIndex, int chapterIndex) throws IOException
@@ -179,97 +198,24 @@ public class CombinedChapterBibleSource extends BibleSource
 				//start = System.currentTimeMillis();
 				
 				DataInputStream input = new DataInputStream(resourceLoader.getResourceAsStream("Bible Data/" + shortBookNames[bookIndex] + "/" + shortBookNames[bookIndex] + " " + currentFileIndex));
-
 				int length = input.readInt();
-				
 				byte[] byteArray = new byte[length];
-				
 				input.readFully(byteArray, 0, length);
-
 				input.close();
 
-				//fileData = new String(byteArray, "UTF-8").toCharArray();
-				
 				// Do our own UTF-8 conversion
-				fileData = new char[length];
-				
-				char currentChar = 0;
-				int charIndex = 0;
-				
-				for (int i = 0; i < length; i++)
-				{
-					byte currentByte = byteArray[i];
+				fileData = toUTF8(length, byteArray);
 
-					// If ASCII character then simply copy in
-					if ((currentByte & 0x80) == 0)
-					{
-						fileData[charIndex] = (char) (currentByte & 0xff);
-					}
-					else if ((currentByte & 0xe0) == 0xc0)	// 2 byte sequence
-					{
-						fileData[charIndex] = (char) (((currentByte & 0x1f) << 6) | (byteArray[++i] & 0x3f));
-					}
-					else if ((currentByte & 0xf0) == 0xe0)	// 3 byte sequence
-					{
-						char c = (char) (((currentByte & 0x0f) << 12) | ((byteArray[++i] & 0x3f) << 6));
-						fileData[charIndex] = (char) (c | (byteArray[++i] & 0x3f));
-					}
-					else if ((currentByte & 0xf8) == 0xf0)	// 4 bytes sequence
-					{
-						// This was the old code. It correctly mapped from UTF8 to UTF32, but we can't
-						// process 32 bit characters. It needs to be broken up into a surrogate pair.
-						// That's what the new code below is doing. -dlh
-						// char c = (char) (((currentByte & 0x07) << 18) | ((byteArray[++i] & 0x3f) << 12));
-						// c |= (char) ((byteArray[++i] & 0x3f) << 6);
-						// fileData[charIndex] = (char) (c | (byteArray[++i] & 0x3f));
-						int codePoint = (((currentByte & 0x07) << 18) | ((byteArray[++i] & 0x3f) << 12));
-						codePoint |= ((byteArray[++i] & 0x3f) << 6) | (byteArray[++i] & 0x3f);
-						// if it's a valid 16 bit code point, just put it out
-						if (codePoint < 0x10000)
-						{
-							fileData[charIndex] = (char) codePoint;
-						}
-						else if (codePoint <= 0x10FFFF)// it needs to be a surrogate pair
-						{
-							int high = (((codePoint-0x00010000) >> 10) + 0xd800);
-							int low = (((codePoint-0x00010000) & 0x3ff) + 0xdc00);
-							fileData[charIndex] = (char) high;
-							fileData[++charIndex] = (char) low;
-						}
-						else	// >= 0x10FFFF, put out the standard REPLACEMENT CHARACTER
-							fileData[charIndex] = '\uFFDF';
-					}
-					else if ((currentByte & 0xff) == 0xf8)	// 5 byte sequence
-					{
-						// This is invalid also (5 bytes)
-//						char c = (char) (((currentByte & 0x03) << 24) | ((byteArray[++i] & 0x3f) << 18));
-//						c |= (char) ((byteArray[++i] & 0x3f) << 12);
-//						c |= (char) ((byteArray[++i] & 0x3f) << 6);
-//						fileData[charIndex] = (char) (c | (byteArray[++i] & 0x3f));
-						int codePoint = (((currentByte & 0x03) << 24) | ((byteArray[++i] & 0x3f) << 18));
-						codePoint |= ((byteArray[++i] & 0x3f) << 12) | ((byteArray[++i] & 0x3f) << 6);
-						codePoint |= (byteArray[++i] & 0x3f);
-						// if it's a valid 16 bit code point, just put it out
-						if (codePoint < 0x10000)
-						{
-							fileData[charIndex] = (char) codePoint;
-						}
-						else if (codePoint <= 0x10FFFF)// it needs to be a surrogate pair
-						{
-							int high = (((codePoint-0x00010000) >> 10) + 0xd800);
-							int low = (((codePoint-0x00010000) & 0x3ff) + 0xdc00);
-							fileData[charIndex] = (char) high;
-							fileData[++charIndex] = (char) low;
-						}
-						else	// >= 0x10FFFF, put out the standard REPLACEMENT CHARACTER
-							fileData[charIndex] = '\uFFDF';
-					}
-										
-					charIndex++;
-				}
-				
+				DataInputStream headingInput = new DataInputStream(resourceLoader.getResourceAsStream("Bible Data/" + shortBookNames[bookIndex] + "/Headings"));
+				int headingLength = headingInput.readInt();
+				byte[] headingByteArray = new byte[headingLength];
+				headingInput.readFully(headingByteArray, 0, headingLength);
+				headingInput.close();
+
+				headingFileData = toUTF8(headingLength, headingByteArray);
+
+				//fileData = new String(byteArray, "UTF-8").toCharArray();
 				//fileData = input.readUTF().toCharArray();
-				
 				//goBible.loadChapterTime = System.currentTimeMillis() - start;
 			}
 
@@ -278,24 +224,122 @@ public class CombinedChapterBibleSource extends BibleSource
 			// Load the chapter's verse data from the fileData
 			verseDataSize = combinedChapterIndex[bookIndex][(chapterIndex << 2) + 2];
 			verseData = new char[verseDataSize];
-			
+
 			// Copy verse data out of fileData
 			System.arraycopy(fileData, combinedChapterIndex[bookIndex][(chapterIndex << 2) + 1], verseData, 0, verseDataSize);
+
+			// Load the chapter's headings
+			if (bookHeadingIndex[chapterIndex].headingCount > 0) {
+				int headingDataSize = 0;
+				for (int i = 0; i < bookHeadingIndex[chapterIndex].headings.length; i++) {
+					headingDataSize += bookHeadingIndex[chapterIndex].headings[i].length;
+				}
+				this.headingDataSize = headingDataSize;
+				headingData = new char[headingDataSize];
+				System.arraycopy(headingFileData, bookHeadingIndex[chapterIndex].headings[0].offset, headingData, 0, headingDataSize);
+			}
+
 		}
+	}
+
+	private char[] toUTF8(int length, byte[] byteArray) {
+		char[] data = new char[length];
+
+		int charIndex = 0;
+
+		for (int i = 0; i < length; i++)
+		{
+			byte currentByte = byteArray[i];
+
+			// If ASCII character then simply copy in
+			if ((currentByte & 0x80) == 0)
+			{
+				data[charIndex] = (char) (currentByte & 0xff);
+			}
+			else if ((currentByte & 0xe0) == 0xc0)	// 2 byte sequence
+			{
+				data[charIndex] = (char) (((currentByte & 0x1f) << 6) | (byteArray[++i] & 0x3f));
+			}
+			else if ((currentByte & 0xf0) == 0xe0)	// 3 byte sequence
+			{
+				char c = (char) (((currentByte & 0x0f) << 12) | ((byteArray[++i] & 0x3f) << 6));
+				data[charIndex] = (char) (c | (byteArray[++i] & 0x3f));
+			}
+			else if ((currentByte & 0xf8) == 0xf0)	// 4 bytes sequence
+			{
+				// This was the old code. It correctly mapped from UTF8 to UTF32, but we can't
+				// process 32 bit characters. It needs to be broken up into a surrogate pair.
+				// That's what the new code below is doing. -dlh
+				// char c = (char) (((currentByte & 0x07) << 18) | ((byteArray[++i] & 0x3f) << 12));
+				// c |= (char) ((byteArray[++i] & 0x3f) << 6);
+				// fileData[charIndex] = (char) (c | (byteArray[++i] & 0x3f));
+				int codePoint = (((currentByte & 0x07) << 18) | ((byteArray[++i] & 0x3f) << 12));
+				codePoint |= ((byteArray[++i] & 0x3f) << 6) | (byteArray[++i] & 0x3f);
+				// if it's a valid 16 bit code point, just put it out
+				if (codePoint < 0x10000)
+				{
+					data[charIndex] = (char) codePoint;
+				}
+				else if (codePoint <= 0x10FFFF)// it needs to be a surrogate pair
+				{
+					int high = (((codePoint-0x00010000) >> 10) + 0xd800);
+					int low = (((codePoint-0x00010000) & 0x3ff) + 0xdc00);
+					data[charIndex] = (char) high;
+					data[++charIndex] = (char) low;
+				}
+				else	// >= 0x10FFFF, put out the standard REPLACEMENT CHARACTER
+					data[charIndex] = '\uFFDF';
+			}
+			else if ((currentByte & 0xff) == 0xf8)	// 5 byte sequence
+			{
+				// This is invalid also (5 bytes)
+//						char c = (char) (((currentByte & 0x03) << 24) | ((byteArray[++i] & 0x3f) << 18));
+//						c |= (char) ((byteArray[++i] & 0x3f) << 12);
+//						c |= (char) ((byteArray[++i] & 0x3f) << 6);
+//						fileData[charIndex] = (char) (c | (byteArray[++i] & 0x3f));
+				int codePoint = (((currentByte & 0x03) << 24) | ((byteArray[++i] & 0x3f) << 18));
+				codePoint |= ((byteArray[++i] & 0x3f) << 12) | ((byteArray[++i] & 0x3f) << 6);
+				codePoint |= (byteArray[++i] & 0x3f);
+				// if it's a valid 16 bit code point, just put it out
+				if (codePoint < 0x10000)
+				{
+					data[charIndex] = (char) codePoint;
+				}
+				else if (codePoint <= 0x10FFFF)// it needs to be a surrogate pair
+				{
+					int high = (((codePoint-0x00010000) >> 10) + 0xd800);
+					int low = (((codePoint-0x00010000) & 0x3ff) + 0xdc00);
+					data[charIndex] = (char) high;
+					data[++charIndex] = (char) low;
+				}
+				else	// >= 0x10FFFF, put out the standard REPLACEMENT CHARACTER
+					data[charIndex] = '\uFFDF';
+			}
+
+			charIndex++;
+		}
+		return data;
 	}
 	
 	private void loadBookIndex(int bookIndex) throws IOException
 	{
 		int numberOfChapters = this.numberOfChapters[bookIndex];
 		this.bookIndex = new int[numberOfChapters][];
+		this.bookHeadingIndex = new ChapterHeadingInfo[numberOfChapters];
 		
 		currentBookIndex = bookIndex;
 		
 		DataInputStream input = new DataInputStream(resourceLoader.getResourceAsStream("Bible Data/" + shortBookNames[bookIndex] + "/Index"));
-		
+
+		// The offset of the headings
+		int headingOffset = 0;
+
 		// Read each verse length in for each chapter
 		for (int chapter = 0; chapter < numberOfChapters; chapter++)
 		{
+			// read heading count
+			int headingCount = input.readUnsignedShort();
+
 			// There are two verse entries (offset, length) for every verse
 			int numberOfVerses = 2 * combinedChapterIndex[bookIndex][(chapter << 2) + 3];
 			int[] chapterIndex = new int[numberOfVerses];
@@ -310,6 +354,19 @@ public class CombinedChapterBibleSource extends BibleSource
 				offset += input.readUnsignedShort();
 				chapterIndex[verse++] = offset;
 			}
+
+			// we store the heading count as first entry and then offset for each heading
+			HeadingInfo[] chapterHeadingIndex = new HeadingInfo[headingCount];
+
+			for (int heading = 0; heading < headingCount; )
+			{
+				int afterVerse = input.readUnsignedShort();
+				int length = input.readUnsignedShort();
+				HeadingInfo info = new HeadingInfo(afterVerse, headingOffset, length);
+				chapterHeadingIndex[heading++] = info;
+				headingOffset += length;
+			}
+			this.bookHeadingIndex[chapter] = new ChapterHeadingInfo(headingCount, chapterHeadingIndex);
 		}
 		
 		input.close();
@@ -348,5 +405,27 @@ public class CombinedChapterBibleSource extends BibleSource
 	public int getVerseDataSize()
 	{
 		return verseDataSize;
+	}
+}
+
+class HeadingInfo {
+	public int afterVerse;
+	public int offset;
+	public int length;
+
+	public HeadingInfo(int afterVerse, int offset, int length) {
+		this.afterVerse = afterVerse;
+		this.offset = offset;
+		this.length = length;
+	}
+}
+
+class ChapterHeadingInfo {
+	public int headingCount;
+	public HeadingInfo[] headings;
+
+	public ChapterHeadingInfo(int headingCount, HeadingInfo[] headings) {
+		this.headingCount = headingCount;
+		this.headings = headings;
 	}
 }

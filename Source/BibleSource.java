@@ -30,7 +30,14 @@ public abstract class BibleSource
 	 * Use getChapterIndex to get the indices of each verse in the chapter string.
 	 */
 	abstract public char[] getChapter(int bookIndex, int chapterIndex) throws IOException;
-	
+
+	/**
+	 * Returns all the headings of the chapter as one string.
+	 * Use getChapterHeadingIndex to get the indices of each heading in the chapter string,
+	 * as well as after which verse each heading goes
+	 */
+	abstract public char[] getChapterHeadings(int bookIndex, int chapterIndex) throws IOException;
+
 	/**
 	 * Returns the size of the current verse data in chars. This should be used
 	 * instead of the length of the array returned by getChapter() because the
@@ -45,6 +52,12 @@ public abstract class BibleSource
 	 * is the offset to the end of the verse in characters.
 	 */
 	abstract public int[] getChapterIndex(int bookIndex, int chapterIndex) throws IOException;
+
+	/**
+	 * Returns an index for the headings of the specified chapter.
+	 * ChapterHeadingInfo contains all the necessary information about a heading (but not the heading itself).
+	 */
+	abstract public ChapterHeadingInfo getChapterHeadingIndex(int bookIndex, int chapterIndex) throws IOException;
 	
 	/**
 	 * Most books will start at Chapter 1 but some may have been split up

@@ -73,6 +73,17 @@ public class GoBible extends MIDlet implements Runnable
 		0xFFFF00,
 	};
 
+	// Theme headings colours
+	public final static int[] THEME_HEADING_COLOUR = new int[]
+	{
+			0xB0B0B0,
+			0xB0B0B0,
+			0x60A060,
+			0xDD7722,
+			0x5533BB,
+			0xBB5500,
+	};
+
 	// Theme highlight colours
 	public final static int[] THEME_HIGHLIGHT_COLOUR = new int[]
 	{
@@ -94,7 +105,6 @@ public class GoBible extends MIDlet implements Runnable
 		0xD00000,
 		0xDD4400,
 	};
-	
 
 	// Static variables
 		
@@ -136,6 +146,8 @@ public class GoBible extends MIDlet implements Runnable
 	// Current chapter contents
 	public static int[] verseIndex;
 	public static char[] verseData;
+	public static ChapterHeadingInfo headingIndex;
+	public static char[] headingData;
 	
 	public BibleSource bibleSource;
 	
@@ -370,6 +382,7 @@ public class GoBible extends MIDlet implements Runnable
 		
 		bibleCanvas.textColour = textColour;
 		bibleCanvas.backColour = backColour;
+		bibleCanvas.headingColor = THEME_HEADING_COLOUR[theme];
 		bibleCanvas.christWordsColour = THEME_CHRIST_COLOUR[theme];
 	
 		display.setCurrent(bibleCanvas);
@@ -1188,6 +1201,8 @@ public class GoBible extends MIDlet implements Runnable
 		{
 			verseData = bibleSource.getChapter(currentBookIndex, currentChapterIndex);
 			verseIndex = bibleSource.getChapterIndex(currentBookIndex, currentChapterIndex);
+			headingData = bibleSource.getChapterHeadings(currentBookIndex, currentChapterIndex);
+			headingIndex = bibleSource.getChapterHeadingIndex(currentBookIndex, currentChapterIndex);
 		}
 		catch(IOException e)
 		{
