@@ -544,6 +544,30 @@ public class BibleCanvas extends Canvas implements CommandListener
 				{
 					enterGotoMode();
 				}
+				else if (goBible.canPlayAudio && goBible.audioEnabled)
+				{
+					switch (keyCode) {
+						case KEY_NUM7: {
+							goBible.audioSkipBackward();
+							break;
+						}
+
+						case KEY_NUM9: {
+							goBible.audioSkipforward();
+							break;
+						}
+
+						case KEY_NUM8: {
+							goBible.playPauseChapterAudio();
+							break;
+						}
+
+						case KEY_NUM0: {
+							goBible.stopAudio();
+							break;
+						}
+					}
+				}
 			}
 		}
 		else if (mode == MODE_GOTO)
@@ -955,6 +979,7 @@ public class BibleCanvas extends Canvas implements CommandListener
 							goBible.headingIndex.headings[index].length  - goBible.headingIndex.headings[0].offset;
                     int hlineStart = startChar;
                     int hlastSpace = -1;
+
                     for (int charIndex = startChar; (charIndex < headingEnd) && ((y + hFontHeight) <= height); charIndex++) {
                         if (isSpace(goBible.headingData[charIndex]))
                         {

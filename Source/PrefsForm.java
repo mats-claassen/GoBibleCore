@@ -31,6 +31,7 @@ public class PrefsForm extends Form implements CommandListener, ItemCommandListe
 	private ChoiceGroup themeChoice;
 	private ChoiceGroup reverseColoursChoice;
 	private ChoiceGroup reverseCharactersChoice;
+	private ChoiceGroup audioChoice;
 	
 	private ColourItem[] themeItems = new ColourItem[]
 	{
@@ -106,6 +107,10 @@ public class PrefsForm extends Form implements CommandListener, ItemCommandListe
 		reverseCharactersChoice = new ChoiceGroup(GoBible.getString("UI-Reverse-Characters") + ":", Choice.EXCLUSIVE, new String[]{GoBible.getString("UI-On"), GoBible.getString("UI-Off")}, null);
 		reverseCharactersChoice.setSelectedIndex(goBible.bibleCanvas.reverseCharacters ? 0 : 1, true);		
 		append(reverseCharactersChoice);
+
+		audioChoice = new ChoiceGroup(GoBible.getString("UI-Audio-Enabled") + ":", Choice.EXCLUSIVE, new String[]{GoBible.getString("UI-On"), GoBible.getString("UI-Off")}, null);
+		audioChoice.setSelectedIndex(goBible.audioEnabled ? 0 : 1, true);
+		append(audioChoice);
 		
 		addCommand(saveCommand);
 		addCommand(cancelCommand);
@@ -139,7 +144,8 @@ public class PrefsForm extends Form implements CommandListener, ItemCommandListe
 					goBible.reverseColours = (reverseColoursChoice.getSelectedIndex() == 0);
 					
 					goBible.bibleCanvas.reverseCharacters = (reverseCharactersChoice.getSelectedIndex() == 0);
-					
+
+					goBible.audioEnabled = (audioChoice.getSelectedIndex() == 0);
 					// Go back to the main screen
 					goBible.showMainScreen();
 					break;

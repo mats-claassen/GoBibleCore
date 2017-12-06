@@ -20,6 +20,7 @@
 //	along with this program; if not, write to the Free Software
 //	Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //
+
 import java.io.*;
 import java.util.*;
 import javax.microedition.lcdui.*;
@@ -128,6 +129,8 @@ public class GoBible extends MIDlet implements Runnable
 	public BibleCanvas bibleCanvas;
 	//private GotoForm gotoForm;
 	private PrefsForm prefsForm;
+
+	private AudioPlayer audioPlayer;
 	
 	private boolean firstRun = true;
 
@@ -148,7 +151,7 @@ public class GoBible extends MIDlet implements Runnable
 	public static char[] verseData;
 	public static ChapterHeadingInfo headingIndex;
 	public static char[] headingData;
-	
+
 	public BibleSource bibleSource;
 	
 	// Search preferences
@@ -192,6 +195,11 @@ public class GoBible extends MIDlet implements Runnable
 	public long byteToCharTime;
 	public long loadChapterTime;
 	public long skipTime;
+
+	// Audio
+	public boolean canPlayAudio = true;
+	public boolean audioEnabled = true;
+	public String audioPath = "file:///TFCard/Others/";
 	
 	private static GoBible lastInstance = null;
 	
@@ -205,7 +213,8 @@ public class GoBible extends MIDlet implements Runnable
 		// Try to turn on the backlight
 		turnOnBacklight();
 
-
+		// Create an AudioPlayer
+		audioPlayer = new AudioPlayer();
 		if (firstRun)
 		{
 			firstRun = false;
@@ -243,6 +252,7 @@ public class GoBible extends MIDlet implements Runnable
 				display.setCurrent(form);
 			}
 		}
+
 /*		if (firstRun)
 		{
 			SplashScreen splashScreen = new SplashScreen(this);
@@ -394,6 +404,22 @@ public class GoBible extends MIDlet implements Runnable
 		
 		// Some of the values may have changed so refresh the display accordingly
 		bibleCanvas.update();
+	}
+
+	public void playPauseChapterAudio() {
+		audioPlayer.togglePlaying();
+	}
+
+	public void audioSkipforward() {
+		audioPlayer.forward();
+	}
+
+	public void audioSkipBackward() {
+		audioPlayer.backward();
+	}
+
+	public void stopAudio() {
+		audioPlayer.stopPlaying();
 	}
 
 	public void addBookmark()
@@ -916,7 +942,10 @@ public class GoBible extends MIDlet implements Runnable
 				// Read in the last from and to books used in the search
 				lastFromBook = input.readByte();
 				lastToBook = input.readByte();
-				
+
+				audioEnabled = input.readBoolean();
+				audioPath = input.readUTF();
+
 				input.close();
 			}
 		}
@@ -969,6 +998,9 @@ public class GoBible extends MIDlet implements Runnable
 			// Write out the last from and to books used in the search
 			output.write(lastFromBook);
 			output.write(lastToBook);
+
+			output.writeBoolean(audioEnabled);
+			output.writeUTF(audioPath);
 			
 			output.close();
 			
@@ -1203,6 +1235,12 @@ public class GoBible extends MIDlet implements Runnable
 			verseIndex = bibleSource.getChapterIndex(currentBookIndex, currentChapterIndex);
 			headingData = bibleSource.getChapterHeadings(currentBookIndex, currentChapterIndex);
 			headingIndex = bibleSource.getChapterHeadingIndex(currentBookIndex, currentChapterIndex);
+
+			// get correct filename
+
+			if (canPlayAudio && audioEnabled) {
+				audioPlayer.setChapter("file:///TFCard/Others/scale.mid");//audioPath + "01 Matta/01 Matta 01.mp3"
+			}
 		}
 		catch(IOException e)
 		{
